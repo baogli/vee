@@ -1,6 +1,8 @@
 import AppKit
+import ApplicationServices
 import Carbon
 import Combine
+import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -10,10 +12,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotKeyManager = HotKeyManager()
     private var popupController: PopupPanelController?
     private var statusItem: NSStatusItem?
+    private var settingsWindow: NSWindow?
     private var cancellables: Set<AnyCancellable> = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        requestAccessibilityIfNeeded()
 
         popupController = PopupPanelController(store: store, settings: settings)
         store.start()
@@ -63,8 +67,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        NSApp.activate()
+        // sendAction(showSettingsWindow:) is unreliable for accessory apps,
+        // so Vee manages its own settings window.
+        if settingsWindow == nil {
+            let hosting = NSHostingController(
+                rootView: SettingsView().environmentObject(settings)
+            )
+            let window = NSWindow(contentViewController: hosting)
+            window.title = "Vee Settings"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false
+            window.center()
+            settingsWindow = window
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    private func requestAccessibilityIfNeeded() {
+        // Without Accessibility trust, the synthetic Command-V is silently
+        // dropped and caret positioning falls back to the mouse.
+        AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
     }
 
     @objc private func quit() {

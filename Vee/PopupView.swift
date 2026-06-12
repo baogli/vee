@@ -65,6 +65,7 @@ final class PopupViewModel: ObservableObject {
 struct PopupView: View {
     @ObservedObject var viewModel: PopupViewModel
     @State private var appeared = false
+    @State private var lensStretch = CGSize(width: 1, height: 1)
     @Namespace private var selectionNamespace
 
     var body: some View {
@@ -77,6 +78,7 @@ struct PopupView: View {
                         number: index + 1,
                         item: item,
                         isSelected: index == viewModel.selectedIndex,
+                        lensStretch: lensStretch,
                         namespace: selectionNamespace
                     )
                 }
@@ -146,7 +148,24 @@ struct PopupView: View {
                 .animation(.easeOut(duration: 0.3).delay(0.24), value: appeared)
             }
         }
-        .animation(.spring(response: 0.26, dampingFraction: 0.8), value: viewModel.selectedIndex)
+        .animation(.spring(response: 0.3, dampingFraction: 0.68), value: viewModel.selectedIndex)
+        .onChange(of: viewModel.selectedIndex) { oldValue, newValue in
+            // Liquid squash & stretch: the lens arrives elongated along its
+            // direction of travel, then springs back into shape.
+            guard let oldValue, let newValue, oldValue != newValue else {
+                return
+            }
+
+            var snap = Transaction()
+            snap.disablesAnimations = true
+            withTransaction(snap) {
+                lensStretch = CGSize(width: 0.92, height: 1.35)
+            }
+
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.52)) {
+                lensStretch = CGSize(width: 1, height: 1)
+            }
+        }
         .padding(8)
         .frame(width: 520, alignment: .topLeading)
         .veeGlass(cornerRadius: 20)
@@ -190,6 +209,7 @@ private struct ClipboardRow: View {
     let number: Int
     let item: ClipboardItem
     let isSelected: Bool
+    let lensStretch: CGSize
     let namespace: Namespace.ID
 
     var body: some View {
@@ -261,6 +281,7 @@ private struct ClipboardRow: View {
                     }
                     .shadow(color: .white.opacity(0.12), radius: 8, y: 2)
                     .matchedGeometryEffect(id: "selection", in: namespace)
+                    .scaleEffect(x: lensStretch.width, y: lensStretch.height)
             }
         }
         .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))

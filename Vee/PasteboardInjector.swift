@@ -10,9 +10,14 @@ final class PasteboardInjector {
 
         pasteboard.clearContents()
         pasteboard.setString(string, forType: .string)
-        sendCommandV()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+        // Give the pasteboard server a beat to publish the new contents
+        // before the target app reads it in response to Command-V.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            self.sendCommandV()
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             snapshot.restore(to: self.pasteboard)
         }
     }

@@ -10,6 +10,8 @@ final class PopupPanelController {
     private var panel: VeePanel?
     private var eventMonitor: Any?
     private var globalMouseMonitor: Any?
+    private var resizeObserver: NSObjectProtocol?
+    private var anchoredTopLeft: CGPoint?
 
     init(store: ClipboardStore, settings: VeeSettings) {
         self.store = store
@@ -68,6 +70,22 @@ final class PopupPanelController {
         self.panel = panel
         resizeAndPosition(panel, fitting: hostingController)
         installEventMonitor(viewModel: viewModel)
+
+        // SwiftUI grows the panel when "More history" expands; keep the top
+        // edge anchored and the whole frame on screen.
+        resizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self, weak panel] _ in
+            MainActor.assumeIsolated {
+                guard let self, let panel else {
+                    return
+                }
+
+                self.clampToScreen(panel)
+            }
+        }
     }
 
     func close() {
@@ -80,6 +98,13 @@ final class PopupPanelController {
             NSEvent.removeMonitor(globalMouseMonitor)
             self.globalMouseMonitor = nil
         }
+
+        if let resizeObserver {
+            NotificationCenter.default.removeObserver(resizeObserver)
+            self.resizeObserver = nil
+        }
+
+        anchoredTopLeft = nil
 
         if let closing = panel {
             panel = nil
@@ -120,6 +145,28 @@ final class PopupPanelController {
         if origin.y < visibleFrame.minY + padding {
             origin.y = anchor.maxY + 8
         }
+
+        if origin.y + size.height > visibleFrame.maxY - padding {
+            origin.y = visibleFrame.maxY - size.height - padding
+        }
+
+        panel.setFrame(NSRect(origin: origin, size: size), display: true)
+        anchoredTopLeft = CGPoint(x: origin.x, y: origin.y + size.height)
+    }
+
+    private func clampToScreen(_ panel: NSPanel) {
+        guard let anchor = anchoredTopLeft else {
+            return
+        }
+
+        let size = panel.frame.size
+        let screen = panel.screen ?? NSScreen.main
+        let visibleFrame = screen?.visibleFrame ?? .zero
+        let padding: CGFloat = 10
+
+        var origin = CGPoint(x: anchor.x, y: anchor.y - size.height)
+        origin.x = min(max(origin.x, visibleFrame.minX + padding), visibleFrame.maxX - size.width - padding)
+        origin.y = max(origin.y, visibleFrame.minY + padding)
 
         if origin.y + size.height > visibleFrame.maxY - padding {
             origin.y = visibleFrame.maxY - size.height - padding

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 800px; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    background: #0b0d1a;
+    position: relative;
+  }
+  /* ---- background: deep mesh gradient ---- */
+  .bg { position: absolute; inset: 0; overflow: hidden; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(90px); }
+  .b1 { width: 700px; height: 700px; left: -180px; top: -220px;
+        background: radial-gradient(circle, rgba(94,92,230,0.75), transparent 70%); }
+  .b2 { width: 800px; height: 800px; right: -240px; top: -160px;
+        background: radial-gradient(circle, rgba(10,132,255,0.6), transparent 70%); }
+  .b3 { width: 700px; height: 700px; left: 22%; bottom: -380px;
+        background: radial-gradient(circle, rgba(255,55,95,0.45), transparent 70%); }
+  .b4 { width: 500px; height: 500px; right: 10%; bottom: -200px;
+        background: radial-gradient(circle, rgba(90,200,250,0.45), transparent 70%); }
+  .b5 { width: 420px; height: 420px; left: 38%; top: -180px;
+        background: radial-gradient(circle, rgba(191,90,242,0.55), transparent 70%); }
+
+  .stage {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 34px;
+  }
+
+  /* ---- fake typing context ---- */
+  .typing {
+    font-size: 26px; font-weight: 500;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 0.2px;
+    display: flex; align-items: center;
+  }
+  .typing .dim { color: rgba(255,255,255,0.35); }
+  .caret {
+    display: inline-block; width: 2.5px; height: 32px;
+    background: #4da3ff; border-radius: 2px;
+    margin-left: 2px;
+    box-shadow: 0 0 12px rgba(77,163,255,0.9);
+  }
+
+  /* ---- the popup ---- */
+  .popup {
+    width: 640px;
+    border-radius: 22px;
+    padding: 9px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.05));
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    position: relative;
+    box-shadow:
+      0 40px 90px rgba(0,0,0,0.55),
+      0 10px 30px rgba(0,0,0,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.28),
+      inset 0 0 0 1px rgba(255,255,255,0.09);
+  }
+  .popup::before {
+    content: ""; position: absolute; inset: 0;
+    border-radius: 22px; pointer-events: none;
+    background: linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.1) 35%, rgba(255,255,255,0.04));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    padding: 1px;
+  }
+
+  .row {
+    display: flex; align-items: center; gap: 11px;
+    height: 42px; padding: 0 14px;
+    border-radius: 12px;
+    position: relative;
+  }
+  .row.sel {
+    background:
+      linear-gradient(135deg, rgba(100,210,255,0.16), rgba(191,90,242,0.13) 55%, rgba(255,110,180,0.11)),
+      rgba(255,255,255,0.10);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.4),
+      inset 0 0 0 0.5px rgba(255,255,255,0.18),
+      0 4px 14px rgba(255,255,255,0.07);
+  }
+  .num {
+    width: 21px; height: 21px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+    font-family: "SF Pro Rounded", -apple-system, sans-serif;
+    color: rgba(255,255,255,0.55);
+    background: rgba(255,255,255,0.08);
+    border-radius: 6px;
+  }
+  .sel .num { color: rgba(255,255,255,0.95); background: rgba(255,255,255,0.2); }
+  .icon { width: 17px; flex: none; display: flex; justify-content: center; }
+  .icon svg { width: 13px; height: 13px; fill: rgba(255,255,255,0.45); }
+  .sel .icon svg { fill: rgba(255,255,255,0.85); }
+  .txt {
+    font-size: 16px; font-weight: 500;
+    color: rgba(255,255,255,0.92);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex: 1;
+  }
+  .txt.code { font-family: "SF Mono", ui-monospace, monospace; font-size: 14.5px; color: rgba(190,255,210,0.9); }
+  .ret {
+    font-size: 11px; font-weight: 700;
+    color: rgba(255,255,255,0.6);
+    flex: none;
+  }
+  .footer {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 12px 5px;
+    border-top: 1px solid rgba(255,255,255,0.09);
+    margin-top: 5px;
+    color: rgba(255,255,255,0.5);
+    font-size: 12px; font-weight: 500;
+  }
+  .footer .dots { font-weight: 700; letter-spacing: 1px; }
+  .footer .count {
+    margin-left: auto;
+    font-size: 10.5px; font-weight: 600;
+    padding: 2px 8px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 99px;
+  }
+
+  /* ---- hotkey hint ---- */
+  .hint {
+    display: flex; align-items: center; gap: 10px;
+    color: rgba(255,255,255,0.55);
+    font-size: 16px; font-weight: 500;
+  }
+  .key {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 34px; padding: 0 9px;
+    font-size: 16px; font-weight: 600;
+    color: rgba(255,255,255,0.85);
+    background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.07));
+    border-radius: 9px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 2px 6px rgba(0,0,0,0.3);
+  }
+
+  /* ---- wordmark ---- */
+  .brand {
+    position: absolute; top: 54px; left: 0; right: 0;
+    text-align: center;
+  }
+  .brand h1 {
+    font-size: 58px; font-weight: 800; letter-spacing: -1.5px;
+    background: linear-gradient(135deg, #ffffff, #a8c6ff 50%, #e3b8ff);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .brand p {
+    margin-top: 8px;
+    font-size: 19px; font-weight: 500;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.2px;
+  }
+</style>
+</head>
+<body>
+  <div class="bg">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="blob b4"></div>
+    <div class="blob b5"></div>
+  </div>
+
+  <div class="brand">
+    <h1>Vee</h1>
+    <p>Your clipboard, right where you're typing.</p>
+  </div>
+
+  <div class="stage">
+    <div class="typing">
+      <span class="dim">Dear team, please review&nbsp;</span><span class="caret"></span>
+    </div>
+
+    <div class="popup">
+      <div class="row">
+        <div class="num">1</div>
+        <div class="icon"><svg viewBox="0 0 16 16"><path d="M6.5 9.5a3.2 3.2 0 0 0 4.6 0l2.6-2.6a3.25 3.25 0 0 0-4.6-4.6L7.7 3.7a.9.9 0 1 0 1.3 1.3l1.4-1.4a1.45 1.45 0 0 1 2 2L9.8 8.2a1.4 1.4 0 0 1-2 0 .9.9 0 0 0-1.3 1.3Zm3-3a3.2 3.2 0 0 0-4.6 0L2.3 9.1a3.25 3.25 0 0 0 4.6 4.6l1.4-1.4a.9.9 0 1 0-1.3-1.3l-1.4 1.4a1.45 1.45 0 0 1-2-2l2.6-2.6a1.4 1.4 0 0 1 2 0 .9.9 0 0 0 1.3-1.3Z"/></svg></div>
+        <div class="txt">https://github.com/baogli/vee</div>
+      </div>
+      <div class="row sel">
+        <div class="num">2</div>
+        <div class="icon"><svg viewBox="0 0 16 16"><path d="M2 3.5c0-.5.4-.9.9-.9h10.2a.9.9 0 1 1 0 1.8H2.9a.9.9 0 0 1-.9-.9Zm0 4.5c0-.5.4-.9.9-.9h10.2a.9.9 0 1 1 0 1.8H2.9A.9.9 0 0 1 2 8Zm.9 3.6a.9.9 0 1 0 0 1.8h6.2a.9.9 0 1 0 0-1.8H2.9Z"/></svg></div>
+        <div class="txt">the launch report — numbers look fantastic this quarter</div>
+        <div class="ret">⏎</div>
+      </div>
+      <div class="row">
+        <div class="num">3</div>
+        <div class="icon"><svg viewBox="0 0 16 16"><path d="M5.7 4.3a.9.9 0 0 0-1.3-1.2L1.1 6.4a.9.9 0 0 0 0 1.2l3.3 3.3a.9.9 0 0 0 1.3-1.2L3 7l2.7-2.7Zm4.6-1.2a.9.9 0 0 0-1.3 1.2L11.7 7 9 9.7a.9.9 0 0 0 1.3 1.2l3.3-3.3a.9.9 0 0 0 0-1.2l-3.3-3.3Z"/></svg></div>
+        <div class="txt code">git push origin main --force-with-lease</div>
+      </div>
+      <div class="row">
+        <div class="num">4</div>
+        <div class="icon"><svg viewBox="0 0 16 16"><path d="M2 3.5c0-.5.4-.9.9-.9h10.2a.9.9 0 1 1 0 1.8H2.9a.9.9 0 0 1-.9-.9Zm0 4.5c0-.5.4-.9.9-.9h10.2a.9.9 0 1 1 0 1.8H2.9A.9.9 0 0 1 2 8Zm.9 3.6a.9.9 0 1 0 0 1.8h6.2a.9.9 0 1 0 0-1.8H2.9Z"/></svg></div>
+        <div class="txt">Meet at 18:30 by the north entrance ✨</div>
+      </div>
+      <div class="row">
+        <div class="num">5</div>
+        <div class="icon"><svg viewBox="0 0 16 16"><path d="M2 3.5c0-.5.4-.9.9-.9h10.2a.9.9 0 1 1 0 1.8H2.9a.9.9 0 0 1-.9-.9Zm0 4.5c0-.5.4-.9.9-.9h10.2a.9.9 0 1 1 0 1.8H2.9A.9.9 0 0 1 2 8Zm.9 3.6a.9.9 0 1 0 0 1.8h6.2a.9.9 0 1 0 0-1.8H2.9Z"/></svg></div>
+        <div class="txt">tax id 7707-083893 · invoice #2214</div>
+      </div>
+      <div class="footer">
+        <span class="dots">···</span>
+        <span>More history</span>
+        <span class="count">12</span>
+      </div>
+    </div>
+
+    <div class="hint">
+      <span class="key">⌥</span><span class="key">⌘</span><span class="key">V</span>
+      <span>&nbsp;anywhere you type</span>
+    </div>
+  </div>
+</body>
+</html>

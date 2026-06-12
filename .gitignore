@@ -9,3 +9,4 @@ DerivedData/
 *.mode2v3
 *.perspectivev3
 build/
+dist/

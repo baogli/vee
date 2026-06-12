@@ -12,6 +12,7 @@ final class PopupPanelController {
     private var globalMouseMonitor: Any?
     private var resizeObserver: NSObjectProtocol?
     private var anchoredTopLeft: CGPoint?
+    private var targetApplication: NSRunningApplication?
 
     init(store: ClipboardStore, settings: VeeSettings) {
         self.store = store
@@ -31,6 +32,7 @@ final class PopupPanelController {
             return
         }
 
+        targetApplication = NSWorkspace.shared.frontmostApplication
         close()
 
         let viewModel = PopupViewModel(
@@ -66,6 +68,10 @@ final class PopupPanelController {
         panel.animationBehavior = .none
         panel.alphaValue = 1
         panel.orderFrontRegardless()
+        // A non-activating panel does not take key status on its own; without
+        // it, digits and Return go to the previously active app.
+        panel.makeKey()
+        VeeLog.write("panel shown, isKey=\(panel.isKeyWindow)")
 
         self.panel = panel
         resizeAndPosition(panel, fitting: hostingController)
@@ -88,7 +94,7 @@ final class PopupPanelController {
         }
     }
 
-    func close() {
+    func close(animated: Bool = true) {
         if let eventMonitor {
             NSEvent.removeMonitor(eventMonitor)
             self.eventMonitor = nil
@@ -108,6 +114,11 @@ final class PopupPanelController {
 
         if let closing = panel {
             panel = nil
+            guard animated else {
+                closing.orderOut(nil)
+                return
+            }
+
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.12
                 closing.animator().alphaValue = 0
@@ -120,9 +131,11 @@ final class PopupPanelController {
     }
 
     private func choose(_ item: ClipboardItem) {
-        close()
+        VeeLog.write("choose: \(item.content.count) chars")
+        let targetApplication = targetApplication
+        close(animated: false)
         store.suspendCapture(for: 1.0)
-        injector.paste(item.content)
+        injector.paste(item.content, into: targetApplication)
     }
 
     private func resizeAndPosition(_ panel: NSPanel, fitting hostingController: NSHostingController<PopupView>) {
@@ -198,6 +211,8 @@ final class PopupPanelController {
                 }
                 return event
             }
+
+            VeeLog.write("local keyDown: code=\(event.keyCode)")
 
             switch event.keyCode {
             case UInt16(kVK_Escape):

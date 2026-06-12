@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        VeeLog.write("launched, AXTrusted=\(AXIsProcessTrusted())")
         requestAccessibilityIfNeeded()
 
         popupController = PopupPanelController(store: store, settings: settings)

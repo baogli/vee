@@ -8,7 +8,9 @@ final class PasteboardInjector {
     private let pasteboard = NSPasteboard.general
     private let log = Logger(subsystem: "com.vee.app", category: "paste")
 
-    func paste(_ string: String) {
+    func paste(_ string: String, into targetApplication: NSRunningApplication?) {
+        VeeLog.write("paste: AXTrusted=\(AXIsProcessTrusted())")
+
         guard AXIsProcessTrusted() else {
             // Without Accessibility trust the synthetic Cmd-V is silently
             // dropped, so surface the problem instead of failing quietly.
@@ -24,10 +26,16 @@ final class PasteboardInjector {
         pasteboard.clearContents()
         pasteboard.setString(string, forType: .string)
 
+        if let targetApplication, !targetApplication.isTerminated {
+            let activated = targetApplication.activate(options: [])
+            VeeLog.write("target activate: \(targetApplication.localizedName ?? "?"), ok=\(activated)")
+        }
+
         // Give the pasteboard server a beat to publish the new contents
         // before the target app reads it in response to Command-V.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            self.sendCommandV()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+            VeeLog.write("sending Cmd-V, frontmost=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "?")")
+            self.sendCommandV(to: targetApplication?.processIdentifier)
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -40,15 +48,21 @@ final class PasteboardInjector {
         NSWorkspace.shared.open(url)
     }
 
-    private func sendCommandV() {
+    private func sendCommandV(to processIdentifier: pid_t?) {
         let source = CGEventSource(stateID: .hidSystemState)
         let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true)
         let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false)
 
         keyDown?.flags = .maskCommand
         keyUp?.flags = .maskCommand
-        keyDown?.post(tap: .cghidEventTap)
-        keyUp?.post(tap: .cghidEventTap)
+
+        if let processIdentifier {
+            keyDown?.postToPid(processIdentifier)
+            keyUp?.postToPid(processIdentifier)
+        } else {
+            keyDown?.post(tap: .cghidEventTap)
+            keyUp?.post(tap: .cghidEventTap)
+        }
     }
 }
 

@@ -121,6 +121,7 @@ final class PopupPanelController {
 
     private func choose(_ item: ClipboardItem) {
         close()
+        store.suspendCapture(for: 1.0)
         injector.paste(item.content)
     }
 

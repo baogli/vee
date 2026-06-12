@@ -1,11 +1,24 @@
 import AppKit
+import ApplicationServices
 import Carbon
+import os.log
 
 @MainActor
 final class PasteboardInjector {
     private let pasteboard = NSPasteboard.general
+    private let log = Logger(subsystem: "com.vee.app", category: "paste")
 
     func paste(_ string: String) {
+        guard AXIsProcessTrusted() else {
+            // Without Accessibility trust the synthetic Cmd-V is silently
+            // dropped, so surface the problem instead of failing quietly.
+            log.error("Paste blocked: process is not trusted for Accessibility")
+            NSSound.beep()
+            openAccessibilitySettings()
+            return
+        }
+
+        log.info("Pasting \(string.count, privacy: .public) characters")
         let snapshot = PasteboardSnapshot.capture(from: pasteboard)
 
         pasteboard.clearContents()
@@ -20,6 +33,11 @@ final class PasteboardInjector {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             snapshot.restore(to: self.pasteboard)
         }
+    }
+
+    private func openAccessibilitySettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
     }
 
     private func sendCommandV() {

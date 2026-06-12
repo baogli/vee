@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Show Vee", action: #selector(showVee), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "Fix Accessibility...", action: #selector(fixAccessibility), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Vee", action: #selector(quit), keyEquivalent: "q"))
 
@@ -93,5 +94,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+
+    @objc private func fixAccessibility() {
+        // The system prompt adds Vee to the Accessibility list by itself;
+        // the user only has to flip the toggle. No file dialogs, no paths.
+        requestAccessibilityIfNeeded()
+
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
     }
 }

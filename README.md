@@ -47,6 +47,10 @@ A small **More history** row reveals the rest of the in-memory tail — without 
 
 ## Install
 
+Download [`Vee-0.1.0.dmg`](dist/Vee-0.1.0.dmg), open it, and drag **Vee** into **Applications**.
+
+Or build from source:
+
 ```bash
 git clone https://github.com/baogli/vee.git
 cd vee
